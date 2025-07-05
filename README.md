@@ -29,7 +29,7 @@ Users should be able to:
 
 ### Links
 
-- Live Site URL: [live site](https://mohamadbiomy.github.io/comments-secton)
+- Live Site URL: [live site](https://mohamadbiomy.github.io/comments-section)
 
 ## My process
 
