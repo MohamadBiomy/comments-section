@@ -2,16 +2,25 @@
 const container = document.querySelector(".container.comments-container")
 const textarea = document.querySelector(".send-element textarea")
 const sendButton = document.querySelector(".send-element button")
+const overlay = document.querySelector(".overlay")
+const popups = document.querySelectorAll(".popup")
 
 // Variables
-let currentUser = {}
+const currentUser = {
+  score: 0,
+  createdAt: "Now",
+  user: {}
+}
 
+
+overlay.remove()
+popups.forEach(pop => pop.remove())
 
 // Fetching data
 fetch("data.json").then(res => res.json())
 .then(data => {
   const userName = data.currentUser.username
-  currentUser = data.currentUser
+  currentUser.user = data.currentUser
   data.comments.forEach(comment => {
     let isSelf = false
     if (userName === comment.user.userName) isSelf = true
@@ -23,18 +32,22 @@ fetch("data.json").then(res => res.json())
 // Sending comment
 sendButton.addEventListener("click", () => {
   if (textarea.value) {
-    const initialComment = {
-      score: 0,
-      content: textarea.value,
-      createdAt: "Now",
-      user: currentUser
-    }
+    const initialComment = currentUser
+    initialComment.content = textarea.value
 
-    createComment(container, initialComment, initialComment.user.username, true)
+    popup("send").then(res => {
+      if (res) {
+        createComment(container, initialComment, initialComment.user.username, true)
+        textarea.value = ""
+      }
+    })
+
   }
 
-  textarea.value = ""
 })
+
+
+
 
 /* ---------- FUNCTIONS ---------- */
 
@@ -95,8 +108,11 @@ function createComment(parent, dataObj, selfName, isSelf = false) {
       holderDiv.append(control)
         // control content
         const reply = document.createElement("div")
+        reply.addEventListener("click", addReplySection)
         const edit = document.createElement("div")
+        edit.addEventListener("click", changeParaToTextarea)
         const del = document.createElement("div")
+        del.addEventListener("click", deleteComment)
         del.className = "del"
         reply.innerHTML = `<i class="fa-solid fa-reply"></i> Reply`
         edit.innerHTML = `<i class="fa-solid fa-pen"></i> Edit`
@@ -184,3 +200,152 @@ function arrangeComment(comment, score) {
   } 
 }
 
+
+function addReplySection() {
+  const comment = this.parentElement.parentElement.parentElement.parentElement
+  const commentContainer = comment.parentElement
+
+  // check if send element is already exits
+  if (commentContainer.querySelector(".send-element")) {
+    return
+  }
+
+  // creating reply element from clone of send element
+  const replyElement = sendButton.parentElement.cloneNode(true)
+  replyElement.querySelector("textarea").setAttribute("placeholder", "Reply to the comment...")
+  replyElement.classList.remove("container")
+  replyElement.classList.add("inner-comment")
+  replyElement.querySelector("button").innerHTML = "REPLY"
+  replyElement.querySelector("button").addEventListener("click", replyComment)
+  
+  commentContainer.insertBefore(replyElement, commentContainer.querySelector(".nested-comments"))
+  
+  // removing send element when clicking anywhere outside the comment container
+  // document.addEventListener()
+  replyElement.querySelector("textarea").focus()
+}
+function replyComment() {
+  // removing the event of removing send element from the document
+  // document.removeEventListener()
+  
+  // check if textarea has content
+  if (!this.previousSibling.previousSibling.value) return
+
+
+  // append new comment to the nested comments
+  const content = this.previousSibling.previousSibling.value
+  const initialComment = currentUser
+  initialComment.content = content
+
+  const nestedCommentsContainer = this.parentElement.parentElement.querySelector(".nested-comments")
+
+
+  popup("send").then(res => {
+    if (res) {
+      createComment(nestedCommentsContainer, initialComment, initialComment.user.username, true)
+
+      // remove send element 
+      this.parentElement.remove()
+    }
+  })
+}
+
+
+function changeParaToTextarea() {
+  
+  const infoDiv = this.parentElement.parentElement.parentElement
+  // disabling click if p is not exited
+  if (!infoDiv.querySelector("& > p")) return
+
+  const para = infoDiv.querySelector("& > p")
+  const content = para.innerText
+
+  para.remove()
+
+  // append a textarea
+  const textarea = document.createElement("textarea")
+  textarea.value = content
+  infoDiv.append(textarea)
+
+  // append update button
+  const button = document.createElement("button")
+  button.innerHTML = "UPDATE"
+  infoDiv.append(button)
+  button.addEventListener("click", updateComment)
+}
+function updateComment() {
+  const infoDiv = this.parentElement
+  const textarea = this.previousSibling
+  const content = textarea.value
+  const para = document.createElement("p")
+
+
+  popup("edit").then(res => {
+    if (res) {
+      textarea.remove()
+      this.remove()
+    
+      para.innerHTML = content
+      infoDiv.append(para)
+    }
+  })
+}
+
+
+function deleteComment() {
+  const commentContainer = this.parentElement.parentElement.parentElement.parentElement.parentElement
+
+  popup("delete")
+  .then(res => {
+    if (res) {
+      commentContainer.remove()
+    }
+  })
+}
+
+
+function popup(type) {
+  return new Promise((resolve) => {
+    let popup;
+
+    switch (type) {
+      case "delete":
+        popup = popups[0]
+        break;
+      case "edit": 
+        popup = popups[1]
+        break;
+      case "send": 
+        popup = popups[2]
+        break;
+    }
+
+    document.body.append(overlay, popup)
+
+    popup.querySelector("button:first-child").addEventListener("click", () => {
+      overlay.remove()
+      popup.remove()
+      resolve(false)
+    })
+    
+    popup.querySelector("button:last-child").addEventListener("click", () => {
+      overlay.remove()
+      popup.remove()
+      resolve(true)
+    })
+  })
+
+
+  // // Example usage:
+  // popup("delete").then(result => {
+  //   if (result) {
+  //     console.log("User confirmed")
+  //     // Proceed with delete action
+  //   } else {
+  //     console.log("User cancelled")
+  //     // Cancel the action
+  //   }
+  // })
+  
+  // console.log(popup("delete"))
+}
