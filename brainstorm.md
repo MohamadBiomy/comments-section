@@ -1,4 +1,4 @@
-- HTML & CSS 
+- HTML & CSS #DONE#
 build and initial comment with nested comments
 
 - comment structure #DONE#
@@ -47,7 +47,7 @@ find how to make text area change it height depending on user inputs
 
 - all screen widths #DONE#
 
-- local storage
+- local storage #DONE#
 
 - use time stamp for self comments
 

@@ -13,21 +13,36 @@ const currentUser = {
 }
 
 
+
 overlay.remove()
 popups.forEach(pop => pop.remove())
 
-// Fetching data
-fetch("data.json").then(res => res.json())
-.then(data => {
-  const userName = data.currentUser.username
-  currentUser.user = data.currentUser
-  data.comments.forEach(comment => {
-    let isSelf = false
-    if (userName === comment.user.userName) isSelf = true
-    createComment(container, comment, userName, isSelf)
-  });
-})
 
+if (localStorage.getItem("comments")) {
+  container.innerHTML = localStorage.getItem("comments")
+  currentUser.user = JSON.parse(localStorage.getItem("currentUser"))
+
+  container.querySelectorAll(".score i:first-child").forEach(i => i.addEventListener("click", increaseScore))
+  container.querySelectorAll(".score i:last-child").forEach(i => i.addEventListener("click", decreaseScore))
+  container.querySelectorAll(".control .del").forEach(b => b.addEventListener("click", deleteComment))
+  container.querySelectorAll(".control .reply").forEach(b => b.addEventListener("click", addReplySection))
+  container.querySelectorAll(".control .edit").forEach(b => b.addEventListener("click", changeParaToTextarea))
+
+} else {
+  // Fetching data
+  fetch("data.json").then(res => res.json())
+  .then(data => {
+    const userName = data.currentUser.username
+    currentUser.user = data.currentUser
+    data.comments.forEach(comment => {
+      let isSelf = false
+      if (userName === comment.user.userName) isSelf = true
+      createComment(container, comment, userName, isSelf)
+    });
+
+    setLocalStorage()
+  })
+}
 
 // Sending comment
 sendButton.addEventListener("click", () => {
@@ -39,6 +54,7 @@ sendButton.addEventListener("click", () => {
       if (res) {
         createComment(container, initialComment, initialComment.user.username, true)
         textarea.value = ""
+        setLocalStorage()
       }
     })
 
@@ -109,8 +125,10 @@ function createComment(parent, dataObj, selfName, isSelf = false) {
         // control content
         const reply = document.createElement("div")
         reply.addEventListener("click", addReplySection)
+        reply.className = "reply"
         const edit = document.createElement("div")
         edit.addEventListener("click", changeParaToTextarea)
+        edit.className = "edit"
         const del = document.createElement("div")
         del.addEventListener("click", deleteComment)
         del.className = "del"
@@ -198,6 +216,8 @@ function arrangeComment(comment, score) {
 
     arrangeComment(comment, score)
   } 
+
+  setLocalStorage()
 }
 
 
@@ -246,6 +266,8 @@ function replyComment() {
 
       // remove send element 
       this.parentElement.remove()
+
+      setLocalStorage()
     }
   })
 }
@@ -287,6 +309,8 @@ function updateComment() {
     
       para.innerHTML = content
       infoDiv.append(para)
+
+      setLocalStorage()
     }
   })
 }
@@ -299,6 +323,7 @@ function deleteComment() {
   .then(res => {
     if (res) {
       commentContainer.remove()
+      setLocalStorage()
     }
   })
 }
@@ -349,3 +374,13 @@ function popup(type) {
   
   // console.log(popup("delete"))
 }
+
+
+function setLocalStorage() {
+
+  localStorage.setItem("comments", container.innerHTML)
+  localStorage.setItem("currentUser", JSON.stringify(currentUser.user))
+
+}
+
+
