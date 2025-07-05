@@ -8,7 +8,6 @@ const popups = document.querySelectorAll(".popup")
 // Variables
 const currentUser = {
   score: 0,
-  createdAt: "Now",
   user: {}
 }
 
@@ -28,6 +27,9 @@ if (localStorage.getItem("comments")) {
   container.querySelectorAll(".control .reply").forEach(b => b.addEventListener("click", addReplySection))
   container.querySelectorAll(".control .edit").forEach(b => b.addEventListener("click", changeParaToTextarea))
 
+  // Restart time updates for all comments
+  restartTimeUpdates()
+
 } else {
   // Fetching data
   fetch("data.json").then(res => res.json())
@@ -37,22 +39,40 @@ if (localStorage.getItem("comments")) {
     data.comments.forEach(comment => {
       let isSelf = false
       if (userName === comment.user.userName) isSelf = true
+      // Convert string timestamps to actual timestamps for existing data
+      if (typeof comment.createdAt === 'string') {
+        comment.createdAt = convertStringToTimestamp(comment.createdAt)
+      }
+      // Convert timestamps for replies
+      if (comment.replies && comment.replies.length > 0) {
+        comment.replies.forEach(reply => {
+          if (typeof reply.createdAt === 'string') {
+            reply.createdAt = convertStringToTimestamp(reply.createdAt)
+          }
+        })
+      }
       createComment(container, comment, userName, isSelf)
     });
 
     setLocalStorage()
+    
+    // Start time updates for initial comments
+    restartTimeUpdates()
   })
 }
 
 // Sending comment
 sendButton.addEventListener("click", () => {
   if (textarea.value) {
-    const initialComment = currentUser
-    initialComment.content = textarea.value
+    const initialComment = {
+      ...currentUser,
+      content: textarea.value,
+      createdAt: Date.now() // Set timestamp when comment is created
+    }
 
     popup("send").then(res => {
       if (res) {
-        createComment(container, initialComment, initialComment.user.username, true)
+        createComment(container, initialComment, initialComment.user.username, true, true)
         textarea.value = ""
         setLocalStorage()
       }
@@ -67,7 +87,7 @@ sendButton.addEventListener("click", () => {
 
 /* ---------- FUNCTIONS ---------- */
 
-function createComment(parent, dataObj, selfName, isSelf = false) {
+function createComment(parent, dataObj, selfName, isSelf = false, isCreatedByUser = false) {
 
   // comment container
   const commentContainer = document.createElement("div")
@@ -112,7 +132,12 @@ function createComment(parent, dataObj, selfName, isSelf = false) {
         const timeAgo = document.createElement("span")
         avatar.src = dataObj.user.image.png
         userName.textContent = dataObj.user.username
-        timeAgo.textContent = dataObj.createdAt
+        // Set initial time display
+        timeAgo.textContent = getTimeAgo(dataObj.createdAt)
+        // Store timestamp as data attribute for later retrieval
+        timeAgo.setAttribute('data-timestamp', dataObj.createdAt)
+        // updating time
+        if (isCreatedByUser) timeUpdate(timeAgo, dataObj.createdAt)
         title.append(avatar, userName)
         const you = document.createElement("span")
         you.textContent = "you"
@@ -239,14 +264,10 @@ function addReplySection() {
   replyElement.querySelector("button").addEventListener("click", replyComment)
   
   commentContainer.insertBefore(replyElement, commentContainer.querySelector(".nested-comments"))
-  
-  // removing send element when clicking anywhere outside the comment container
-  // document.addEventListener()
+
   replyElement.querySelector("textarea").focus()
 }
 function replyComment() {
-  // removing the event of removing send element from the document
-  // document.removeEventListener()
   
   // check if textarea has content
   if (!this.previousSibling.previousSibling.value) return
@@ -254,15 +275,18 @@ function replyComment() {
 
   // append new comment to the nested comments
   const content = this.previousSibling.previousSibling.value
-  const initialComment = currentUser
-  initialComment.content = content
+  const initialComment = {
+    ...currentUser,
+    content: content,
+    createdAt: Date.now() // Set timestamp when reply is created
+  }
 
   const nestedCommentsContainer = this.parentElement.parentElement.querySelector(".nested-comments")
 
 
   popup("send").then(res => {
     if (res) {
-      createComment(nestedCommentsContainer, initialComment, initialComment.user.username, true)
+      createComment(nestedCommentsContainer, initialComment, initialComment.user.username, true, true)
 
       // remove send element 
       this.parentElement.remove()
@@ -377,10 +401,98 @@ function popup(type) {
 
 
 function setLocalStorage() {
-
   localStorage.setItem("comments", container.innerHTML)
   localStorage.setItem("currentUser", JSON.stringify(currentUser.user))
-
 }
 
+// Handle page close event
+window.addEventListener('beforeunload', function(e) {
+  // Save data before page closes
+  setLocalStorage()
+  
+  // Optional: Show confirmation dialog (modern browsers may ignore this)
+  // e.preventDefault()
+  // e.returnValue = 'Are you sure you want to leave? Your changes may not be saved.'
+})
 
+
+function getTimeAgo(timestamp) {
+  const now = Date.now()
+  const timeDiff = Math.floor((now - timestamp) / 1000) // Convert to seconds
+  
+  if (timeDiff < 60) {
+    return `${timeDiff} seconds ago`
+  } else if (timeDiff >= 60 && timeDiff < 3600) {
+    const minutes = Math.floor(timeDiff / 60)
+    return `${minutes} minutes ago`
+  } else if (timeDiff >= 3600 && timeDiff < 86400) {
+    const hours = Math.floor(timeDiff / 3600)
+    return `${hours} hours ago`
+  } else if (timeDiff >= 86400 && timeDiff < 2592000) {
+    const days = Math.floor(timeDiff / 86400)
+    return `${days} days ago`
+  } else if (timeDiff >= 2592000 && timeDiff < 31536000) {
+    const months = Math.floor(timeDiff / 2592000)
+    return `${months} months ago`
+  } else {
+    const years = Math.floor(timeDiff / 31536000)
+    return `${years} years ago`
+  }
+}
+
+function timeUpdate(timeElement, timestamp) {
+  setInterval(() => {
+    timeElement.textContent = getTimeAgo(timestamp)
+  }, 5000)
+}
+
+function convertStringToTimestamp(timeString) {
+  const now = Date.now()
+  const lowerTimeString = timeString.toLowerCase()
+  
+  if (lowerTimeString.includes('second')) {
+    const seconds = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (seconds * 1000)
+  } else if (lowerTimeString.includes('minute')) {
+    const minutes = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (minutes * 60 * 1000)
+  } else if (lowerTimeString.includes('hour')) {
+    const hours = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (hours * 60 * 60 * 1000)
+  } else if (lowerTimeString.includes('day')) {
+    const days = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (days * 24 * 60 * 60 * 1000)
+  } else if (lowerTimeString.includes('week')) {
+    const weeks = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (weeks * 7 * 24 * 60 * 60 * 1000)
+  } else if (lowerTimeString.includes('month')) {
+    const months = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (months * 30 * 24 * 60 * 60 * 1000)
+  } else if (lowerTimeString.includes('year')) {
+    const years = parseInt(lowerTimeString.match(/\d+/)[0])
+    return now - (years * 365 * 24 * 60 * 60 * 1000)
+  }
+  
+  // Default to current time if parsing fails
+  return now
+}
+
+function restartTimeUpdates() {
+  // Find all time elements and restart their updates
+  const timeElements = container.querySelectorAll('.title span')
+  
+  timeElements.forEach(timeElement => {
+    // Check if this span contains time text (like "5 minutes ago")
+    const text = timeElement.textContent
+    if (text && (text.includes('ago') || text.includes('second') || text.includes('minute') || text.includes('hour') || text.includes('day') || text.includes('month') || text.includes('year'))) {
+      const timestamp = timeElement.getAttribute('data-timestamp')
+      
+      if (timestamp) {
+        // Update the display immediately
+        timeElement.textContent = getTimeAgo(parseInt(timestamp))
+        // Start the interval for live updates
+        timeUpdate(timeElement, parseInt(timestamp))
+      }
+    }
+  })
+}

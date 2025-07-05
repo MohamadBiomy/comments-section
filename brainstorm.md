@@ -49,8 +49,8 @@ find how to make text area change it height depending on user inputs
 
 - local storage #DONE#
 
-- use time stamp for self comments
+- use time stamp for self comments #DONE with AI#
 
 
 - search for:
-  removeEventListener()
+  removeEventListener() #DONE#
